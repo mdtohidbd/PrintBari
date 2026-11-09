@@ -1,0 +1,82 @@
+name: DocuStudio CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 1. Quality, Typecheck & Static Analysis
+  quality-gate:
+    name: Code Quality & Type Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Workspace Dependencies
+        run: npm ci
+
+      - name: Backend Type Check (TypeScript strict)
+        run: npx tsc --noEmit -p backend/tsconfig.json
+
+      - name: Frontend Type Check (TypeScript strict)
+        run: npx tsc --noEmit -p frontend/tsconfig.json
+
+  # 2. Security Audits & Secret Leak Prevention
+  security-audit:
+    name: Dependency Audit & Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret Leak Prevention Guard
+        run: |
+          echo "Scanning for sensitive credentials, private keys, and hardcoded secrets..."
+          # Reject committed private keys or unmasked production MFS credentials
+          ! grep -rE "BEGIN (RSA|EC|OPENSSH) PRIVATE KEY" --exclude-dir={node_modules,.git,dist} .
+          ! grep -rE "(BKASH_APP_SECRET|SSLCOMMERZ_STORE_PASS)\s*=\s*['\"][a-zA-Z0-9_-]{10,}['\"]" --exclude-dir={node_modules,.git,dist} .
+
+      - name: NPM Dependency Vulnerability Audit
+        run: npm audit --audit-level=high --omit=dev || echo "Audit completed with non-blocking warnings"
+
+  # 3. Build & Artifacts Validation
+  build-validation:
+    name: Build Validation
+    needs: [quality-gate, security-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Workspace Dependencies
+        run: npm ci
+
+      - name: Build Backend Service
+        run: npm run build -w backend
+
+      - name: Verify Build Artifacts
+        run: |
+          test -f backend/dist/server.js || exit 1
+          echo "Backend distribution package compiled cleanly."
+

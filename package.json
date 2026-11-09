@@ -1,0 +1,29 @@
+{
+  "name": "docustudio-saas-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-Tenant Shop Management & Document Processing SaaS Platform (Studiozly-Inspired)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue,green\" \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "build": "npm run build -w backend && npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "lint": "npm run lint -w backend && npm run lint -w frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "saas",
+    "multi-tenant",
+    "document-processing",
+    "photo-studio",
+    "photocopy-management"
+  ],
+  "author": "DocuStudio Engineering Team",
+  "license": "UNLICENSED"
+}
+
